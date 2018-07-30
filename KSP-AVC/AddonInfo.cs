@@ -50,22 +50,19 @@ namespace KSP_AVC
 
         #region Constructors
 
-        public AddonInfo(string path, string json, RemoteType remoteType)
+        public AddonInfo(string path, Dictionary<string, object> data, RemoteType remoteType)
         {
-            // Following because some files are returning a few gibberish chars when downloading from Github
-            json = DeleteCharsPrecedingBrace(json);
-
             try
             {
                 this.path = path;
                 switch (remoteType)
                 {
                     case RemoteType.AVC:
-                        this.ParseAvc(path, json);
+                        this.ParseAvc(data);
                         break;
 #if false
                     case RemoteType.KerbalStuff:
-                        this.ParseKerbalStuff(json);
+                        this.ParseKerbalStuff(data);
                         break;
 #endif
                 }
@@ -74,32 +71,11 @@ namespace KSP_AVC
             }
             catch
             {
-                this.ParseError = true;
-                this.AddParseErrorMsg = "Error parsing: " + path;
+                Logger.Log("Version file contains errors: " + path);
                 throw;
             }
-            finally
-            {
-                if (this.ParseError)
-                {
-                    Logger.Log("Version file contains errors: " + path);
-                    foreach (var s in this.ParseErrorMsgs)
-                        Logger.Log("Error: " + s);
-                    throw new ArgumentException("Not a valid JSON object.");
-                }
-            }
         }
 
-        string DeleteCharsPrecedingBrace(string json)
-        {
-            int i = json.IndexOf('{');
-            if (i == 0)
-                return json;
-            if (i == -1)
-                return "";
-            return json.Substring(i);
-
-        }
         static AddonInfo()
         {
             actualKspVersion = new VersionInfo(Versioning.version_major, Versioning.version_minor, Versioning.Revision);
@@ -352,12 +328,6 @@ namespace KSP_AVC
 
         public bool IsLockedByCreator { get; private set; } //Enable/Disable the Compatibility Override feature for this mod, set in the version file
 
-        public bool ParseError { get; private set; }
-
-        private List<string> parseErrorMsgs = new List<string>();
-        public string AddParseErrorMsg { set { parseErrorMsgs.Add(value); } }
-        internal List<string> ParseErrorMsgs { get { return parseErrorMsgs; } }
-
         public string Url { get; private set; }
 
         public VersionInfo Version { get; private set; }
@@ -528,16 +498,8 @@ namespace KSP_AVC
 #endif
         }
 
-        private void ParseAvc(string path, string json)
+        private void ParseAvc(Dictionary<string, object> data)
         {
-            var data = Json.Deserialize(json) as Dictionary<string, object>;
-            if (data == null)
-            {
-                this.ParseError = true;
-                this.AddParseErrorMsg = "Error in Json.Deserialize, file: " + path;
-
-                throw new ArgumentException("Not a valid JSON object.");
-            }
             foreach (var key in data.Keys)
             {
                 switch (key.ToUpper())
@@ -672,24 +634,12 @@ namespace KSP_AVC
         {
             if (KspVersionMin > KspVersionMax)
             {
-                this.ParseError = true;
-                this.AddParseErrorMsg = "KSP_VERSION_MIN greater than KSP_VERSION_MAX";
                 throw new ArgumentException("KSP_VERSION_MIN greater than KSP_VERSION_MAX");
             }
-
-
         }
 
-        private void ParseKerbalStuff(string json)
+        private void ParseKerbalStuff(Dictionary<string, object> data)
         {
-            var data = Json.Deserialize(json) as Dictionary<string, object>;
-            if (data == null)
-            {
-                this.ParseError = true;
-                this.AddParseErrorMsg = "No data from Json (kerbalstuff)";
-                throw new ArgumentException("No data from Json (kerbalstuff)");
-            }
-
             this.Name = (string)data["name"];
         }
 #if false

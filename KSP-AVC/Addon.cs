@@ -18,6 +18,7 @@
 #region Using Directives
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 //using System.Threading;
@@ -133,13 +134,9 @@ namespace KSP_AVC
         {
             using (var stream = new StreamReader(File.OpenRead(path)))
             {
-                this.LocalInfo = new AddonInfo(path, stream.ReadToEnd(), AddonInfo.RemoteType.AVC);
+                var data = (Dictionary<string, object>)Json.Deserialize(DeleteCharsPrecedingBrace(stream.ReadToEnd()));
+                this.LocalInfo = new AddonInfo(path, data, AddonInfo.RemoteType.AVC);
                 this.IsLocalReady = true;
-
-                if (this.LocalInfo.ParseError)
-                {
-                    this.SetHasError();
-                }
             }
         }
         //const long TicsPerSec = 10000000;
@@ -284,9 +281,10 @@ namespace KSP_AVC
 #endif
         private void SetRemoteAvcInfo(string json)
         {
+            json = DeleteCharsPrecedingBrace(json);
             //            this.RemoteInfo = new AddonInfo(this.LocalInfo.Url, www.text, AddonInfo.RemoteType.AVC);
-            this.RemoteInfo = new AddonInfo(this.LocalInfo.Url, json, AddonInfo.RemoteType.AVC);
-
+            var data = (Dictionary<string, object>)Json.Deserialize(json);
+            this.RemoteInfo = new AddonInfo(this.LocalInfo.Url, data, AddonInfo.RemoteType.AVC);
             this.RemoteInfo.FetchRemoteData();
 
 
@@ -312,7 +310,8 @@ namespace KSP_AVC
 #if false
         private void SetRemoteKerbalStuffInfo(UnityWebRequest www)
         {
-            this.RemoteInfo = new AddonInfo(this.LocalInfo.KerbalStuffUrl, www.url, AddonInfo.RemoteType.KerbalStuff);
+            var data = Json.Deserialize(DeleteCharsPrecedingBrace(www.text)) as Dictionary<string, object>;
+            this.RemoteInfo = new AddonInfo(this.LocalInfo.KerbalStuffUrl, data, AddonInfo.RemoteType.KerbalStuff);
 
             if (this.LocalInfo.Version == this.RemoteInfo.Version)
             {
@@ -333,6 +332,17 @@ namespace KSP_AVC
         }
 #endif
 
-#endregion
+        // Following because some files are returning a few gibberish chars when downloading from Github
+        private string DeleteCharsPrecedingBrace(string json)
+        {
+            int i = json.IndexOf('{');
+            if (i == 0)
+                return json;
+            if (i == -1)
+                return "";
+            return json.Substring(i);
+        }
+
+        #endregion
     }
 }
