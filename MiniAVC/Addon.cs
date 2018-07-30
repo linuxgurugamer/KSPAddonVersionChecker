@@ -12,7 +12,10 @@
 // see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using UnityEngine;
 
@@ -21,6 +24,9 @@ namespace MiniAVC
     public class Addon
     {
         private readonly AddonSettings settings;
+
+        private string localInfoBase64String = string.Empty;
+        private string remoteInfoBase64String = string.Empty;
 
         public Addon(string path, AddonSettings settings)
         {
@@ -32,7 +38,7 @@ namespace MiniAVC
         {
             get
             {
-                return LocalInfo.Base64String + RemoteInfo.Base64String;
+                return localInfoBase64String + remoteInfoBase64String;
             }
         }
 
@@ -100,13 +106,11 @@ namespace MiniAVC
         {
             using (var stream = new StreamReader(File.OpenRead(path)))
             {
-                LocalInfo = new AddonInfo(path, stream.ReadToEnd());
+                var json = stream.ReadToEnd();
+                var data = (Dictionary<string, object>)Json.Deserialize(json);
+                LocalInfo = new AddonInfo(path, data);
+                localInfoBase64String = ConvertToBase64(json);
                 IsLocalReady = true;
-
-                if (LocalInfo.ParseError)
-                {
-                    SetHasError();
-                }
             }
         }
 
@@ -193,7 +197,10 @@ namespace MiniAVC
 
         private void SetRemoteInfo(WWW www)
         {
-            RemoteInfo = new AddonInfo(LocalInfo.Url, www.text);
+            var json = www.text;
+            var data = (Dictionary<string, object>)Json.Deserialize(json);
+            RemoteInfo = new AddonInfo(LocalInfo.Url, data);
+            remoteInfoBase64String = ConvertToBase64(json);
             RemoteInfo.FetchRemoteData();
 
             Logger.Log("LocalInfo.Url: " + LocalInfo.Url + ",   www.text: " + www.text);
@@ -215,6 +222,11 @@ namespace MiniAVC
 
             IsRemoteReady = true;
             IsProcessingComplete = true;
+        }
+
+        private string ConvertToBase64(string data)
+        {
+            return Regex.Replace(Convert.ToBase64String(Encoding.ASCII.GetBytes(data)), @"\s+", string.Empty);
         }
     }
 }
