@@ -198,9 +198,47 @@ namespace MiniAVC
         private void SetRemoteInfo(WWW www)
         {
             var json = www.text;
-            var data = (Dictionary<string, object>)Json.Deserialize(json);
-            RemoteInfo = new AddonInfo(LocalInfo.Url, data);
+            var data = Json.Deserialize(json);
             remoteInfoBase64String = ConvertToBase64(json);
+            
+            if (data is Dictionary<string, object> dataDict)
+            {
+                RemoteInfo = new AddonInfo(LocalInfo.Url, dataDict);
+            }
+            else if (data is List<object> versionDataList)
+            {
+                if (versionDataList.Count == 0)
+                {
+                    throw new FormatException(LocalInfo.Name + ": Remote AVC file contains an empty array");
+                }
+
+                foreach (var versionData in versionDataList)
+                {
+                    var addonInfo = new AddonInfo(LocalInfo.Url, (Dictionary<string, object>)versionData);
+
+                    if (!addonInfo.IsCompatible || addonInfo.Version == null)
+                    {
+                        continue;
+                    }
+
+                    if (RemoteInfo == null || addonInfo.Version > RemoteInfo.Version)
+                    {
+                        RemoteInfo = addonInfo;
+                    }
+                }
+
+                if (RemoteInfo == null)
+                {
+                    Logger.Log(LocalInfo.Name + ": Couldn't find any compatible version in remote info");
+                    SetLocalInfoOnly();
+                    return;
+                }
+            }
+            else
+            {
+                throw new FormatException(LocalInfo.Name + ": Remote AVC file has an unrecognized root element type: " + data?.GetType().ToString() ?? "null");
+            }
+
             RemoteInfo.FetchRemoteData();
 
             Logger.Log("LocalInfo.Url: " + LocalInfo.Url + ",   www.text: " + www.text);
