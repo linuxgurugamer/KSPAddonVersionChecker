@@ -283,8 +283,46 @@ namespace KSP_AVC
         {
             json = DeleteCharsPrecedingBrace(json);
             //            this.RemoteInfo = new AddonInfo(this.LocalInfo.Url, www.text, AddonInfo.RemoteType.AVC);
-            var data = (Dictionary<string, object>)Json.Deserialize(json);
-            this.RemoteInfo = new AddonInfo(this.LocalInfo.Url, data, AddonInfo.RemoteType.AVC);
+            var data = Json.Deserialize(json);
+
+            if (data is Dictionary<string, object> dataDict)
+            {
+                this.RemoteInfo = new AddonInfo(this.LocalInfo.Url, dataDict, AddonInfo.RemoteType.AVC);
+            }
+            else if (data is List<object> versionDataList)
+            {
+                if (versionDataList.Count == 0)
+                {
+                    throw new FormatException(this.LocalInfo.Name + ": Remote AVC file contains an empty array");
+                }
+
+                foreach (var versionData in versionDataList)
+                {
+                    var addonInfo = new AddonInfo(this.LocalInfo.Url, (Dictionary<string, object>)versionData, AddonInfo.RemoteType.AVC);
+
+                    if (!addonInfo.IsCompatible || addonInfo.Version == null)
+                    {
+                        continue;
+                    }
+
+                    if (this.RemoteInfo == null || addonInfo.Version > this.RemoteInfo.Version)
+                    {
+                        this.RemoteInfo = addonInfo;
+                    }
+                }
+
+                if (RemoteInfo == null)
+                {
+                    Logger.Log(this.LocalInfo.Name + ": Couldn't find any compatible version in remote info");
+                    SetLocalInfoOnly();
+                    return;
+                }
+            }
+            else
+            {
+                throw new FormatException(this.LocalInfo.Name + ": Remote AVC file has an unrecognized root element type: " + data?.GetType().ToString() ?? "null");
+            }
+
             this.RemoteInfo.FetchRemoteData();
 
 
@@ -336,11 +374,15 @@ namespace KSP_AVC
         private string DeleteCharsPrecedingBrace(string json)
         {
             int i = json.IndexOf('{');
-            if (i == 0)
+            int j = json.IndexOf('[');
+            if (i == 0 || j == 0)
                 return json;
-            if (i == -1)
+            if (i == -1 && j > 0)
+                return json.Substring(j);
+            if (i > 0 && j == -1)
+                return json.Substring(i);
+            else
                 return "";
-            return json.Substring(i);
         }
 
         #endregion
