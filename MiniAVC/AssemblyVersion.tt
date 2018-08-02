@@ -30,7 +30,7 @@
 	//
 	// Update the following with the complete path to the .version file
 	//
-	string versionfile =  @"D:\Users\jbb\github\KSPAddonVersionChecker\KSP-AVC.version";
+	string versionfile =  @"..\..\KSP-AVC.version";
 
 	if (!File.Exists(versionfile))
 	{
