@@ -1,6 +1,6 @@
 {
   "NAME": "KSP-AVC Plugin",
-  "URL": "http://ksp.spacetux.net/avc/KSP-AVC",
+  "URL": "https://raw.githubusercontent.com/linuxgurugamer/KSPAddonVersionChecker/master/KSP-AVC.version",
   "DOWNLOAD": "https://github.com/linuxgurugamer/KSPAddonVersionChecker/releases",
   "GITHUB": {
     "USERNAME": "linuxgurugamer",
