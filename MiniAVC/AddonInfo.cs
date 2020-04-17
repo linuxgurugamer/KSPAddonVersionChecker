@@ -13,8 +13,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Net;
 //using System.Threading;
 
@@ -40,25 +38,17 @@ namespace MiniAVC
             actualKspVersion = new VersionInfo(Versioning.version_major, Versioning.version_minor, Versioning.Revision);
         }
 
-        public AddonInfo(string path, string json)
+        public AddonInfo(string path, Dictionary<string, object> data)
         {
             try
             {
                 this.path = path;
-                Base64String = Regex.Replace(Convert.ToBase64String(Encoding.ASCII.GetBytes(json)), @"\s+", string.Empty); ;
-                Parse(json);
+                Parse(data);
             }
             catch
             {
-                ParseError = true;
+                Logger.Log("Version file contains errors: " + path);
                 throw;
-            }
-            finally
-            {
-                if (ParseError)
-                {
-                    Logger.Log("Version file contains errors: " + path);
-                }
             }
         }
 
@@ -66,8 +56,6 @@ namespace MiniAVC
         {
             get { return actualKspVersion; }
         }
-
-        public string Base64String { get; private set; } = string.Empty;
 
         public string Download { get; private set; }
 
@@ -148,8 +136,6 @@ namespace MiniAVC
         public bool KspExcludeVersionIsNull { get { return this.kspExcludeVersions == null; } }
 
         public string Name { get; private set; }
-
-        public bool ParseError { get; private set; }
 
         public string Url { get; private set; }
 
@@ -241,14 +227,8 @@ namespace MiniAVC
             return version;
         }
 
-        private void Parse(string json)
+        private void Parse(Dictionary<string, object> data)
         {
-            var data = MiniAVC.Json.Deserialize(json) as Dictionary<string, object>;
-            if (data == null)
-            {
-                ParseError = true;
-                return;
-            }
             foreach (var key in data.Keys)
             {
                 switch (key.ToUpper())

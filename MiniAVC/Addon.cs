@@ -12,8 +12,11 @@
 // see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
 //using System.Threading;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -23,6 +26,9 @@ namespace MiniAVC
     public class Addon
     {
         private readonly AddonSettings settings;
+
+        private string localInfoBase64String = string.Empty;
+        private string remoteInfoBase64String = string.Empty;
 
         public Addon(string path, AddonSettings settings)
         {
@@ -34,7 +40,7 @@ namespace MiniAVC
         {
             get
             {
-                return LocalInfo.Base64String + RemoteInfo.Base64String;
+                return localInfoBase64String + remoteInfoBase64String;
             }
         }
 
@@ -104,13 +110,11 @@ namespace MiniAVC
         {
             using (var stream = new StreamReader(File.OpenRead(path)))
             {
-                LocalInfo = new AddonInfo(path, stream.ReadToEnd());
+                var json = stream.ReadToEnd();
+                var data = (Dictionary<string, object>)Json.Deserialize(json);
+                LocalInfo = new AddonInfo(path, data);
+                localInfoBase64String = ConvertToBase64(json);
                 IsLocalReady = true;
-
-                if (LocalInfo.ParseError)
-                {
-                    SetHasError();
-                }
             }
         }
 
@@ -241,7 +245,47 @@ namespace MiniAVC
 #endif
         private void SetRemoteInfo(string json)
         {
-            RemoteInfo = new AddonInfo(LocalInfo.Url, json);
+            var data = Json.Deserialize(json);
+            remoteInfoBase64String = ConvertToBase64(json);
+            
+            if (data is Dictionary<string, object> dataDict)
+            {
+                RemoteInfo = new AddonInfo(LocalInfo.Url, dataDict);
+            }
+            else if (data is List<object> versionDataList)
+            {
+                if (versionDataList.Count == 0)
+                {
+                    throw new FormatException(LocalInfo.Name + ": Remote AVC file contains an empty array");
+                }
+
+                foreach (var versionData in versionDataList)
+                {
+                    var addonInfo = new AddonInfo(LocalInfo.Url, (Dictionary<string, object>)versionData);
+
+                    if (!addonInfo.IsCompatible || addonInfo.Version == null)
+                    {
+                        continue;
+                    }
+
+                    if (RemoteInfo == null || addonInfo.Version > RemoteInfo.Version)
+                    {
+                        RemoteInfo = addonInfo;
+                    }
+                }
+
+                if (RemoteInfo == null)
+                {
+                    Logger.Log(LocalInfo.Name + ": Couldn't find any compatible version in remote info");
+                    SetLocalInfoOnly();
+                    return;
+                }
+            }
+            else
+            {
+                throw new FormatException(LocalInfo.Name + ": Remote AVC file has an unrecognized root element type: " + data?.GetType().ToString() ?? "null");
+            }
+
             RemoteInfo.FetchRemoteData();
 #if true
             if (LocalInfo.Version == RemoteInfo.Version)
@@ -261,6 +305,11 @@ namespace MiniAVC
 
             IsRemoteReady = true;
             IsProcessingComplete = true;
+        }
+
+        private string ConvertToBase64(string data)
+        {
+            return Regex.Replace(Convert.ToBase64String(Encoding.ASCII.GetBytes(data)), @"\s+", string.Empty);
         }
     }
 }
